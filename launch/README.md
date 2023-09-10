@@ -67,8 +67,7 @@ cd ~/image_pipeline
 source install/setup.bash
 ```
 ```
-ros2 run camera_calibration cameracalibrator --size 6x8 --square 0.025 \
-    --no-service-check --ros-args \
+ros2 run camera_calibration cameracalibrator --size 7x9 --square 0.02 --ros-args \
     -r image:=/camera/color/image_raw  \
     -p camera:=/camera
 ```
