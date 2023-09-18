@@ -230,6 +230,32 @@ class Camera():
         """
         modified_image = self.VideoFrame.copy()
         # Write your code here
+        
+        for msg in msg.detections:
+
+            id_list = [2, 3, 4, 6, 7, 8]
+            if msg.id in id_list:
+                cv2.circle(modified_image, (int(msg.centre.x), int(msg.centre.y)), 1, (255, 0,0), 2)
+                cv2.rectangle(modified_image, (int(msg.corners[0].x), int(msg.corners[0].y)), (int(msg.corners[2].x), int(msg.corners[2].y)), (0, 255, 0), 2)
+                
+                font                   = cv2.FONT_HERSHEY_SIMPLEX
+                bottomLeftCornerOfText = (int(msg.corners[3].x + 5), int(msg.corners[3].y - 25))
+                fontScale              = 0.5
+                fontColor              = (0,0,255)
+                thickness              = 2
+                lineType               = 2
+
+                cv2.putText(modified_image, f"ID:{msg.id}", 
+                    bottomLeftCornerOfText, 
+                    font, 
+                    fontScale,
+                    fontColor,
+                    thickness,
+                    lineType)
+
+            else:
+                raise NotImplementedError
+
 
         self.TagImageFrame = modified_image
 

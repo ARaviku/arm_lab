@@ -8,8 +8,6 @@ import rclpy
 import os
 import matplotlib
 import matplotlib.pyplot as plt
-import pandas as pd 
-
 
 matplotlib.use('Agg')
 
@@ -97,12 +95,6 @@ class StateMachine():
 
         if self.next_state == "release":
             self.grip_release()
-        
-        if self.next_state == "save":
-            self.save()
-        
-        if self.next_state == "reset":
-            self.reset()
 
         if self.next_state == "manual":
             self.manual()
@@ -176,7 +168,7 @@ class StateMachine():
         """
         # self.current_state = "record"
         self.joint_pos.append(self.rxarm.get_positions())
-        # print(f"The position {self.joint_pos}")
+        print(f"The position {self.joint_pos}")
         self.next_state = "idle"
     
     def grip_grasp(self):
@@ -193,33 +185,6 @@ class StateMachine():
         """
         # self.current_state = "release"
         self.release_pos.append(len(self.joint_pos))
-        self.next_state = 'idle'
-
-    def save(self):
-        """!
-        @brief  Saves the current position
-        """
-
-        df = pd.DataFrame(self.joint_pos)
-        csv_file = df.to_csv('/home/student_pm/armlab-f23/csv_files/joint_pos.csv', index=True)
-
-        df_grip_close = pd.DataFrame(self.grasp_pos)
-        csv_file = df_grip_close.to_csv('/home/student_pm/armlab-f23/csv_files/close_grip.csv', index=True)
-
-        df_grip_open = pd.DataFrame(self.release_pos)
-        csv_file = df_grip_open.to_csv('/home/student_pm/armlab-f23/csv_files/open_grip.csv', index=True)
-        time.sleep(2)
-        
-        self.next_state = 'idle'
-
-    def reset(self):
-        """!
-        @brief Reset joint_pos list, grasp_position and release position
-        """
-
-        self.joint_pos = []
-        self.grasp_pos = []
-        self.release_pos = []
         self.next_state = 'idle'
 
     def initialize_rxarm(self):

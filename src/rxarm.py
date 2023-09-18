@@ -16,6 +16,7 @@ from functools import partial
 from kinematics import FK_dh, FK_pox, get_pose_from_T
 import time
 import csv
+import math
 import sys, os
 
 from builtins import super
@@ -82,7 +83,7 @@ class RXArm(InterbotixManipulatorXS):
         self.velocity_fb = None
         self.effort_fb = None
         # DH Params
-        self.dh_params = []
+        self.dh_params = self.get_dh_parameters()
         self.dh_config_file = dh_config_file
         if (dh_config_file is not None):
             self.dh_params = RXArm.parse_dh_param_file(dh_config_file)
@@ -184,16 +185,38 @@ class RXArm(InterbotixManipulatorXS):
         """
         return self.effort_fb
 
+    def get_offsets(self):
+        """!
+        @brief
+
+        @return
+        """
+        joint_angles = np.array(self.get_positions())
+        offset = np.array([0., 0., 0., 0., 0.])
+        for i in range(1000):
+            offset += joint_angles
+        average_offset = offset/1000
+        offset_val = average_offset
+        return offset_val
+
 
 #   @_ensure_initialized
 
-    def get_ee_pose(self):
+    def get_ee_pose(self, offset):
         """!
         @brief      TODO Get the EE pose.
 
         @return     The EE pose as [x, y, z, phi] or as needed.
         """
-        return [0, 0, 0, 0]
+        joint_angles = self.get_positions()
+        joint_angles -= offset
+        # print(joint_angles)
+        link = 5
+        # print(f"Joint Angles: {joint_angles[0], joint_angles[1], joint_angles[2], joint_angles[3], joint_angles[4]}")
+        dh_pr = self.get_dh_parameters()
+        out = FK_dh(dh_pr, joint_angles, link)
+
+        return out
 
     @_ensure_initialized
     def get_wrist_pose(self):
@@ -224,6 +247,13 @@ class RXArm(InterbotixManipulatorXS):
 
         @return     The dh parameters.
         """
+        self.dh_params = [[math.pi/2, 103.91, 0, -math.pi/2],
+                          [-math.atan(4), 0, 205.73, 0],
+                          [math.atan(4), 0, 200, 0],
+                          [math.pi/2, 0, 0, math.pi/2],
+                          [0, 174.15, 0, 0]
+                          ]
+
         return self.dh_params
 
 
@@ -244,6 +274,7 @@ class RXArmThread(QThread):
         """
         QThread.__init__(self, parent=parent)
         self.rxarm = rxarm
+        self.bool_offset = True
         self.node = rclpy.create_node('rxarm_thread')
         self.subscription = self.node.create_subscription(
             JointState,
@@ -259,8 +290,13 @@ class RXArmThread(QThread):
         self.rxarm.velocity_fb = np.asarray(data.velocity)[0:5]
         self.rxarm.effort_fb = np.asarray(data.effort)[0:5]
         self.updateJointReadout.emit(self.rxarm.position_fb.tolist())
-        self.updateEndEffectorReadout.emit(self.rxarm.get_ee_pose())
-        #for name in self.rxarm.joint_names:
+        offset = np.zeros(5)
+        if self.bool_offset:
+            offset = self.rxarm.get_offsets()
+            self.bool_offset = False
+
+        self.updateEndEffectorReadout.emit(self.rxarm.get_ee_pose(offset))
+        # for name in self.rxarm.joint_names:
         #    print("{0} gains: {1}".format(name, self.rxarm.get_motor_pid_params(name)))
         if (__name__ == '__main__'):
             print(self.rxarm.position_fb)

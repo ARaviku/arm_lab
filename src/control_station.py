@@ -101,10 +101,6 @@ class Gui(QMainWindow):
         self.ui.btnUser6.clicked.connect(partial(nxt_if_arm_init, 'grasp'))
         self.ui.btnUser7.setText("Release_Loc")
         self.ui.btnUser7.clicked.connect(partial(nxt_if_arm_init, 'release'))
-        self.ui.btnUser8.setText("Reset")
-        self.ui.btnUser8.clicked.connect(partial(nxt_if_arm_init, 'reset'))
-        self.ui.btnUser9.setText("Save")
-        self.ui.btnUser9.clicked.connect(partial(nxt_if_arm_init, 'save'))
 
         # Sliders
         for sldr in self.joint_sliders:
@@ -147,12 +143,13 @@ class Gui(QMainWindow):
     ### TODO: output the rest of the orientation according to the convention chosen
     @pyqtSlot(list)
     def updateEndEffectorReadout(self, pos):
-        self.ui.rdoutX.setText(str("%+.2f mm" % (1000 * pos[0])))
-        self.ui.rdoutY.setText(str("%+.2f mm" % (1000 * pos[1])))
-        self.ui.rdoutZ.setText(str("%+.2f mm" % (1000 * pos[2])))
-        #self.ui.rdoutPhi.setText(str("%+.2f rad" % (pos[3])))
-        #self.ui.rdoutTheta.setText(str("%+.2f" % (pos[4])))
-        #self.ui.rdoutPsi.setText(str("%+.2f" % (pos[5])))
+        # I removed multiply by 1000 from x, y and z
+        self.ui.rdoutX.setText(str("%+.2f mm" % (pos[0])))
+        self.ui.rdoutY.setText(str("%+.2f mm" % (pos[1])))
+        self.ui.rdoutZ.setText(str("%+.2f mm" % ( pos[2])))
+        self.ui.rdoutPhi.setText(str("%+.2f rad" % (pos[3])))
+        self.ui.rdoutTheta.setText(str("%+.2f" % (pos[4])))
+        self.ui.rdoutPsi.setText(str("%+.2f" % (pos[5])))
 
     @pyqtSlot(QImage, QImage, QImage, QImage)
     def setImage(self, rgb_image, depth_image, tag_image, grid_image):
