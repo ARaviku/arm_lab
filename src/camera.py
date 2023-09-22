@@ -53,6 +53,9 @@ class Camera():
         """ block info """
         self.block_contours = np.array([])
         self.block_detections = np.array([])
+        self.messages= None
+        self.transform_counter = 0
+        self.transform_mat = None
 
     def processVideoFrame(self):
         """!
@@ -166,9 +169,13 @@ class Camera():
 
         @param      file  The file
         """
-        
-        self.intrinsic_matrix = np.array([[939.409, 0, 618.505],
-                                          [0, 945.988, 328.224],
+        # Calculated intrinsic params after calibration
+        # self.intrinsic_matrix = np.array([[939.409, 0, 618.505],
+        #                                   [0, 945.988, 328.224],
+        #                                   [0, 0, 1]])
+        # Factory Intrinsic Setting
+        self.intrinsic_matrix = np.array([[907.9, 0, 641.046],
+                                          [0, 908.35, 354.884],
                                           [0, 0, 1]])
         inv_intrinsic_matrix = np.linalg.inv(self.intrinsic_matrix)
         
@@ -180,15 +187,84 @@ class Camera():
 
         """
         # This is Hinv
-        inv_matrix_homogeneous = np.array([[1, 0, 0, -40],
-                                       [0, -1, 0, 190],
-                                       [0, 0, -1, 1020],
-                                       [0, 0, 0, 1]])
+        # inv_matrix_homogeneous = np.array([[1, 0, 0, -40],
+        #                                [0, -1, 0, 190],
+        #                                [0, 0, -1, 1020],
+        #                                [0, 0, 0, 1]])
+        # inv_matrix_homogeneous = self.extrinsic_matrix_cal()
         # This is H
-        matrix_homogeneous = np.linalg.inv(inv_matrix_homogeneous)
+        # matrix_homogeneous = np.linalg.inv(inv_matrix_homogeneous)
 
-        return matrix_homogeneous, inv_matrix_homogeneous
+        matrix_homogeneous = self.extrinsic_matrix_cal()
+        matrix_homogeneous = np.array([[ 9.98526583e-01, -1.07363350e-02, -5.31920445e-02,  2.67844599e+01],
+                                       [-4.47806721e-04, -9.81829037e-01,  1.89767073e-01,  1.70920548e+02],
+                                       [-5.42628967e-02, -1.89463647e-01, -9.80387201e-01,  1.03091259e+03],
+                                       [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+        if matrix_homogeneous is not None:
+            matrix_homogeneous_inv = np.linalg.inv(matrix_homogeneous)
+            return matrix_homogeneous, matrix_homogeneous_inv
+        
+    
+    def extrinsic_matrix_cal(self):
+        """!
+        @brief      Solve for the extrinsic matrix of the camera.
 
+        @param      intrinsic_matrix, distortion and image and camera points.
+        """
+
+        distortion = np.array([0.0791, -0.1517, -0.0029, 0.0027, 0]).astype(np.float32)
+        # distortion = np.zeros(shape=(5,), dtype=np.float32)
+        object_points_dict = {4: np.array([[-250, 275, 0], [-265, 260, 0], [-255, 260, 0], [-255, 290, 0], [-275, 290, 0]]),
+                              3: np.array([[250, 275, 0], [235, 260, 0], [265, 260, 0], [265, 290, 0], [235, 290, 0]]), 
+                              2: np.array([[250, -25, 0], [235, -40, 0], [265, -40, 0], [265, -10 ,0], [235, -10, 0]]),
+                              6: np.array([[-425, 150, 155], [-440, 135, 155], [-410, 135, 155], [-410, 165, 155], [-440, 165, 155]]),
+                              7: np.array([[-250, -25, 0], [-265, -40, 0], [-255, -40, 0], [-255, -10, 0], [-275, -10, 0]]),
+                              8: np.array([[425, 100, 93], [410, 85, 93], [440, 85, 93], [440, 115, 93], [410, 115, 93]])
+                             }
+
+        # object_points = np.array([[250, -25, 0], [250, 275, 0], [-250, 275, 0], [-250, -25, 0]])
+        count = 0
+        image_points = []
+
+        if self.messages is not None:
+            for msg in self.messages.detections:
+                count += 1
+                id_list = [2, 3, 4, 6, 7, 8]
+                if msg.id in id_list:
+                    # The values from the tag_IDs are pixel coordinates of the camera.
+                    u, v = int(msg.centre.x), int(msg.centre.y)
+                    corn1_u, corn1_v = int(msg.corners[0].x), int(msg.corners[0].y)
+                    corn2_u, corn2_v = int(msg.corners[1].x), int(msg.corners[1].y)
+                    corn3_u, corn3_v = int(msg.corners[2].x), int(msg.corners[2].y)
+                    corn4_u, corn4_v = int(msg.corners[3].x), int(msg.corners[3].y)
+                    append_list = [u, v, corn1_u, corn1_v, corn2_u, corn2_v, corn3_u, corn3_v, corn4_u ,corn4_v]
+                    # append_list = [u, v]
+                    image_points.extend(append_list)
+                    
+                else:
+                    raise NotImplementedError
+                
+                if count > 30:
+                    break
+            
+            array_list = []
+            for key in sorted(object_points_dict.keys()):
+                array_list.append(object_points_dict[key])
+            
+            object_points = np.concatenate(array_list, axis=0)
+            object_points = object_points.astype(np.float32)
+
+            image_points = np.array(image_points).astype(np.float32)
+            image_points = image_points.reshape(30, 2)
+
+            # Gives us the H matrix
+            _, rvec, tvec = cv2.solvePnP(object_points, image_points, self.intrinsic_matrix, distortion)
+            rmatrix = cv2.Rodrigues(rvec)[0]
+            H_transform = np.hstack((rmatrix, tvec.reshape(3,1)))
+            H_transform = np.vstack((H_transform,np.array([0,0,0,1])))
+
+            return H_transform
+    
     def blockDetector(self):
         """!
         @brief      Detect blocks from rgb
@@ -215,7 +291,40 @@ class Camera():
                     and draw on self.GridFrame the grid intersection points from self.grid_points
                     (hint: use the cv2.circle function to draw circles on the image)
         """
-        pass
+        if self.messages is not None:
+            if self.transform_counter < 5:
+                self.transform_counter += 1
+                self.GridFrame = self.VideoFrame.copy()
+                x_points, y_points = self.grid_points # these points are  in objects points in the world frame 
+                depth_value = 0
+                world_coordinates = [[x,y, depth_value, 1] for x,y in zip(x_points.ravel(), y_points.ravel())]
+                world_coordinates_array = np.array(world_coordinates)
+
+                # world to camera coordinates
+                mat_h, mat_hinv = self.homogeneous_transform_mat()
+                camera_coordinates = mat_h @ np.transpose(world_coordinates_array)
+                print(f"camera_coord {camera_coordinates[0]}")
+
+
+                # camera to pixel coordinates
+                pixel_coord = self.intrinsic_matrix @ camera_coordinates[:3, :]
+                pixel_coord /= pixel_coord[2][:]
+                print(f"Pixel coordinates shape {pixel_coord.shape} and first item {pixel_coord[0][0]}")
+
+                # plotting on the video frame 
+                x_coords = pixel_coord[0, :].astype(int)
+                y_coords = pixel_coord[1, :].astype(int)  
+
+                for x, y in zip(x_coords, y_coords):
+                    cv2.circle(self.GridFrame, (x, y), radius= 2, color=(0, 255, 0), thickness=2)           
+
+                projected_points = np.array([[0, 0], [1280, 0], [1280, 720], [0, 720]], dtype=np.float32)
+                original_points = np.array([[174, 53], [1164, 53], [1111, 658], [227, 659]], dtype=np.float32)
+                self.transform_mat = cv2.getPerspectiveTransform(original_points, projected_points)
+
+                self.GridFrame = cv2.warpPerspective(self.GridFrame, self.transform_mat, (1280, 720))
+
+        return 
      
     def drawTagsInRGBImage(self, msg):
         """
@@ -230,7 +339,7 @@ class Camera():
         """
         modified_image = self.VideoFrame.copy()
         # Write your code here
-        
+        self.messages = msg
         for msg in msg.detections:
 
             id_list = [2, 3, 4, 6, 7, 8]

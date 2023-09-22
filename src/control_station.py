@@ -87,7 +87,7 @@ class Gui(QMainWindow):
         self.ui.btn_sleep_arm.clicked.connect(lambda: self.rxarm.sleep())
 
         #User Buttons
-        self.ui.btnUser1.setText("Calibrate")
+        self.ui.btnUser1.setText("Calibrate (extrinsics)")
         self.ui.btnUser1.clicked.connect(partial(nxt_if_arm_init, 'calibrate'))
         self.ui.btnUser2.setText('Open Gripper')
         self.ui.btnUser2.clicked.connect(lambda: self.rxarm.gripper.release())

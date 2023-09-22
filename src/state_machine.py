@@ -150,6 +150,9 @@ class StateMachine():
         @brief      Gets the user input to perform the calibration
         """
         self.current_state = "calibrate"
+        H = self.camera.extrinsic_matrix_cal()
+        self.camera.projectGridInRGBImage()
+
         self.next_state = "idle"
 
         """TODO Perform camera calibration routine here"""
