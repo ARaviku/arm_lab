@@ -151,7 +151,8 @@ class StateMachine():
         """
         self.current_state = "calibrate"
         H = self.camera.extrinsic_matrix_cal()
-        self.camera.projectGridInRGBImage()
+        np.save(file=os.path.join('extrinsic.npy'), arr=H)
+        # self.camera.projectGridInRGBImage()
 
         self.next_state = "idle"
 

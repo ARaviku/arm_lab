@@ -13,7 +13,7 @@ You will upgrade some functions and also implement others according to the comme
 """
 import numpy as np
 from functools import partial
-from kinematics import FK_dh, FK_pox, get_pose_from_T
+from kinematics import FK_dh, FK_pox, get_pose_from_T, IK_geometric
 import time
 import csv
 import math
@@ -201,7 +201,6 @@ class RXArm(InterbotixManipulatorXS):
 
 
 #   @_ensure_initialized
-
     def get_ee_pose(self, offset):
         """!
         @brief      TODO Get the EE pose.
@@ -215,7 +214,9 @@ class RXArm(InterbotixManipulatorXS):
         # print(f"Joint Angles: {joint_angles[0], joint_angles[1], joint_angles[2], joint_angles[3], joint_angles[4]}")
         dh_pr = self.get_dh_parameters()
         out = FK_dh(dh_pr, joint_angles, link)
-
+        pose = np.array(out).reshape(6,1)
+        ik_out = IK_geometric(pose)
+        # print(ik_out)
         return out
 
     @_ensure_initialized

@@ -235,6 +235,7 @@ class Gui(QMainWindow):
             pixel_coord = np.array([[pt.x()], 
                                     [pt.y()], 
                                     [1]])
+            z += 10
             camera_coord = (z*inv_k) @ pixel_coord
             camera_coord = np.vstack((camera_coord,1))
             mat_h, mat_hinv = self.camera.homogeneous_transform_mat()

@@ -8,6 +8,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import SingleThreadedExecutor, MultiThreadedExecutor
 
+import os
 import cv2
 import time
 import numpy as np
@@ -191,16 +192,14 @@ class Camera():
         #                                [0, -1, 0, 190],
         #                                [0, 0, -1, 1020],
         #                                [0, 0, 0, 1]])
-        # inv_matrix_homogeneous = self.extrinsic_matrix_cal()
-        # This is H
-        # matrix_homogeneous = np.linalg.inv(inv_matrix_homogeneous)
-
-        matrix_homogeneous = self.extrinsic_matrix_cal()
-        matrix_homogeneous = np.array([[ 9.98526583e-01, -1.07363350e-02, -5.31920445e-02,  2.67844599e+01],
-                                       [-4.47806721e-04, -9.81829037e-01,  1.89767073e-01,  1.70920548e+02],
-                                       [-5.42628967e-02, -1.89463647e-01, -9.80387201e-01,  1.03091259e+03],
-                                       [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+        
+        # matrix_homogeneous = np.array([[ 9.98526583e-01, -1.07363350e-02, -5.31920445e-02,  2.67844599e+01],
+        #                                [-4.47806721e-04, -9.81829037e-01,  1.89767073e-01,  1.70920548e+02],
+        #                                [-5.42628967e-02, -1.89463647e-01, -9.80387201e-01,  1.03091259e+03],
+        #                                [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+        matrix_homogeneous = np.load(file=os.path.join('extrinsic.npy'))
         if matrix_homogeneous is not None:
+            matrix_homogeneous = np.load(file=os.path.join('extrinsic.npy'))
             matrix_homogeneous_inv = np.linalg.inv(matrix_homogeneous)
             return matrix_homogeneous, matrix_homogeneous_inv
         
@@ -217,9 +216,9 @@ class Camera():
         object_points_dict = {4: np.array([[-250, 275, 0], [-265, 260, 0], [-255, 260, 0], [-255, 290, 0], [-275, 290, 0]]),
                               3: np.array([[250, 275, 0], [235, 260, 0], [265, 260, 0], [265, 290, 0], [235, 290, 0]]), 
                               2: np.array([[250, -25, 0], [235, -40, 0], [265, -40, 0], [265, -10 ,0], [235, -10, 0]]),
-                              6: np.array([[-425, 150, 155], [-440, 135, 155], [-410, 135, 155], [-410, 165, 155], [-440, 165, 155]]),
+                            #   6: np.array([[-425, 150, 155], [-440, 135, 155], [-410, 135, 155], [-410, 165, 155], [-440, 165, 155]]),
                               7: np.array([[-250, -25, 0], [-265, -40, 0], [-255, -40, 0], [-255, -10, 0], [-275, -10, 0]]),
-                              8: np.array([[425, 100, 93], [410, 85, 93], [440, 85, 93], [440, 115, 93], [410, 115, 93]])
+                            #   8: np.array([[425, 150, 93], [410, 135, 93], [440, 135, 93], [440, 165, 93], [410, 165, 93]])
                              }
 
         # object_points = np.array([[250, -25, 0], [250, 275, 0], [-250, 275, 0], [-250, -25, 0]])
@@ -244,7 +243,7 @@ class Camera():
                 else:
                     raise NotImplementedError
                 
-                if count > 30:
+                if count > 20:
                     break
             
             array_list = []
@@ -255,7 +254,8 @@ class Camera():
             object_points = object_points.astype(np.float32)
 
             image_points = np.array(image_points).astype(np.float32)
-            image_points = image_points.reshape(30, 2)
+            # print(f"image_points: {image_points.shape}")
+            image_points = image_points.reshape(20, 2)
 
             # Gives us the H matrix
             _, rvec, tvec = cv2.solvePnP(object_points, image_points, self.intrinsic_matrix, distortion)
@@ -265,14 +265,83 @@ class Camera():
 
             return H_transform
     
-    def blockDetector(self):
+    def blockDetector(self, image):
         """!
         @brief      Detect blocks from rgb
 
                     TODO: Implement your block detector here. You will need to locate blocks in 3D space and put their XYZ
                     locations in self.block_detections
         """
-        pass
+
+        # image = self.VideoFrame.copy()
+        # cv2.imread(image)
+        cv2.imwrite("image.jpg", image)
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+        cv2.imwrite("rgb_img.jpg", rgb_image)
+        # time.sleep(2)
+
+        cv2.imwrite("hsv_img.jpg", hsv_image)
+        # time.sleep(2)
+
+        
+        # range for blue 
+        lower_blue = np.array([90, 150, 20])
+        upper_blue = np.array([130, 255, 255])
+        mask_blue = cv2.inRange(hsv_image, lower_blue, upper_blue)
+        detected_blue_output = cv2.bitwise_and(image, image, mask = mask_blue)
+        cv2.imwrite("blue_color_detection.jpg", detected_blue_output)
+        # time.sleep(2)
+
+
+        # Range for orange
+        orange_lower = np.array([5,120,20])
+        orange_upper = np.array([20,255,255])
+        mask_orange = cv2.inRange(hsv_image, orange_lower, orange_upper)
+        detected_orange_output = cv2.bitwise_and(rgb_image, rgb_image, mask=mask_orange)
+        cv2.imwrite("orange_color_detection.jpg", detected_orange_output)
+        # time.sleep(2)
+
+        # Range for upper range
+        red1_lower = np.array([170,110,20])
+        red1_upper = np.array([180,255,255])
+        mask_red1 = cv2.inRange(hsv_image, red1_lower, red1_upper)
+
+
+        # red_lower = np.array([0,110,20])
+        # red_upper = np.array([5,255,255])
+        # mask_red2 = cv2.inRange(hsv_image, red_lower, red_upper)
+
+        # mask_red  = mask_red1 + mask_red2
+        
+        detected_red_output = cv2.bitwise_and(rgb_image, rgb_image, mask=mask_red1)
+        cv2.imwrite("red_color_detection.png", detected_red_output)
+
+        yellow_lower = np.array([23, 75, 50])
+        yellow_upper = np.array([35, 255, 255])
+        mask_yellow = cv2.inRange(hsv_image, yellow_lower, yellow_upper)
+        detected_yellow_output = cv2.bitwise_and(rgb_image, rgb_image, mask = mask_yellow)
+        cv2.imwrite("yellow_color_detection.jpg", detected_yellow_output)
+        
+        green_lower = np.array([40,50,20])
+        green_upper = np.array([86,255,255])
+        mask_green = cv2.inRange(hsv_image, green_lower, green_upper)
+        detected_green_output = cv2.bitwise_and(rgb_image, rgb_image, mask=mask_green)
+        cv2.imwrite("green_color_detection.jpg", detected_green_output)
+
+        purple_lower = np.array([120,40,0])
+        purple_upper = np.array([150,255,255])
+        mask_purple = cv2.inRange(hsv_image, purple_lower, purple_upper)
+        detected_purple_output = cv2.bitwise_and(rgb_image, rgb_image, mask=mask_purple)
+        cv2.imwrite("purple_color_detection.png", detected_purple_output)
+
+
+        mask = mask_yellow + mask_blue + mask_green + mask_orange + mask_purple + mask_red1
+        detected_colors = cv2.bitwise_and(rgb_image, rgb_image, mask=mask)
+        cv2.imwrite("detection.png", detected_colors)
+        
+        return
+
 
     def detectBlocksInDepthImage(self):
         """!
@@ -303,13 +372,13 @@ class Camera():
                 # world to camera coordinates
                 mat_h, mat_hinv = self.homogeneous_transform_mat()
                 camera_coordinates = mat_h @ np.transpose(world_coordinates_array)
-                print(f"camera_coord {camera_coordinates[0]}")
+                # print(f"camera_coord {camera_coordinates[0]}")
 
 
                 # camera to pixel coordinates
                 pixel_coord = self.intrinsic_matrix @ camera_coordinates[:3, :]
                 pixel_coord /= pixel_coord[2][:]
-                print(f"Pixel coordinates shape {pixel_coord.shape} and first item {pixel_coord[0][0]}")
+                # print(f"Pixel coordinates shape {pixel_coord.shape} and first item {pixel_coord[0][0]}")
 
                 # plotting on the video frame 
                 x_coords = pixel_coord[0, :].astype(int)
@@ -323,7 +392,7 @@ class Camera():
                 self.transform_mat = cv2.getPerspectiveTransform(original_points, projected_points)
 
                 self.GridFrame = cv2.warpPerspective(self.GridFrame, self.transform_mat, (1280, 720))
-
+                self.blockDetector(self.GridFrame)
         return 
      
     def drawTagsInRGBImage(self, msg):
@@ -342,7 +411,8 @@ class Camera():
         self.messages = msg
         for msg in msg.detections:
 
-            id_list = [2, 3, 4, 6, 7, 8]
+            # id_list = [2, 3, 4, 6, 7, 8]
+            id_list = [2, 3, 4, 7]
             if msg.id in id_list:
                 cv2.circle(modified_image, (int(msg.centre.x), int(msg.centre.y)), 1, (255, 0,0), 2)
                 cv2.rectangle(modified_image, (int(msg.corners[0].x), int(msg.corners[0].y)), (int(msg.corners[2].x), int(msg.corners[2].y)), (0, 255, 0), 2)
@@ -363,9 +433,10 @@ class Camera():
                     lineType)
 
             else:
-                raise NotImplementedError
+                # raise NotImplementedError
+                continue
 
-
+        # print("Here")
         self.TagImageFrame = modified_image
 
 class ImageListener(Node):
@@ -425,6 +496,7 @@ class DepthListener(Node):
     def callback(self, data):
         try:
             cv_depth = self.bridge.imgmsg_to_cv2(data, data.encoding)
+            print(f"cvdepth {cv_depth}")
             # cv_depth = cv2.rotate(cv_depth, cv2.ROTATE_180)
         except CvBridgeError as e:
             print(e)
@@ -470,6 +542,7 @@ class VideoThread(QThread):
                 depth_frame = self.camera.convertQtDepthFrame()
                 tag_frame = self.camera.convertQtTagImageFrame()
                 self.camera.projectGridInRGBImage()
+                # self.camera.blockDetector()
                 grid_frame = self.camera.convertQtGridFrame()
                 if ((rgb_frame != None) & (depth_frame != None)):
                     self.updateFrame.emit(

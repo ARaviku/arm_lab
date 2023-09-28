@@ -118,7 +118,7 @@ def get_euler_angles_from_T(T):
     # Convert the rotation matrix to Euler angles.
     r = Rotation.from_matrix(rotation_matrix)
     # print(f'r{r}')
-    euler_angles = r.as_euler('zyx', degrees=False)
+    euler_angles = r.as_euler('ZYZ', degrees=False)
     # print(f"euler angles {euler_angles}")
     return euler_angles[0], euler_angles[1], euler_angles[2]
 
@@ -133,8 +133,10 @@ def get_pose_from_T(T):
     @return     The pose vector from T.
 
     """
-    pass
-
+    Pose = np.zeros((6,1))
+    Pose[:3] = T[:3, 3]
+    Pose[3:] = Rotation.from_matrix("ZYZ", T[:3, :3])
+    return Pose
 
 def FK_pox(joint_angles, m_mat, s_lst):
     """!
@@ -167,16 +169,53 @@ def to_s_matrix(w, v):
     pass
 
 
-def IK_geometric(dh_params, pose):
+def IK_geometric(pose):
     """!
     @brief      Get all possible joint configs that produce the pose.
 
                 TODO: Convert a desired end-effector pose vector as np.array to joint angles
 
-    @param      dh_params  The dh parameters
-    @param      pose       The desired pose vector as np.array 
+    @param      pose       The desired pose vector as np.array  |  pose: [x, y, z , alpha, beta, gamma] (ZYZ Euler) shape (6x1)
 
     @return     All four possible joint configurations in a numpy array 4x4 where each row is one possible joint
                 configuration
     """
-    pass
+    joint_config = []
+    l1 = 103.91
+    l2 = 200
+    l3 = 50
+    l4 = 200
+    l5 = 174.15
+    end_position = pose[:3]
+    end_euler = pose[3:]
+    end_matrix = Rotation.from_euler('ZYZ',end_euler.reshape(3)).as_matrix()
+    
+    # q1,q2,q3,q4,q5 = (0,0,0,0,0)
+    o4_origin = end_position - l5 * end_matrix @ np.array([0,0,1]).reshape(3,1)
+    q1 = -np.arctan2(o4_origin[0][0], o4_origin[1][0])
+    x4p = np.linalg.norm(o4_origin[0:2])
+    z4p = o4_origin[2][0] - l1
+    theta0 = np.arctan(l3/l2)
+    theta1 = np.arctan(z4p/x4p)
+    # First Solution
+    q3 = np.pi / 2 + theta0 - np.arccos((l2*l2 + l3*l3 + l4*l4 - x4p*x4p - z4p*z4p)/(2*l4*np.sqrt(l2*l2+l3*l3))) # Maybe multiple solution
+    theta2 = np.arctan((l3 + l4*np.cos(q3))/(l2 - l4*np.sin(q3)))
+    q2 = np.pi / 2 - theta1 - theta2
+    R4w = Rotation.from_euler('ZYZ', [q1, - np.pi / 2, np.pi/2 + q2 + q3]).as_matrix()
+    Re4 = np.linalg.inv(R4w) @ end_matrix
+    Re4a = Rotation.from_matrix(Re4).as_euler('ZYZ')
+    q4 = Re4a[0]
+    q5 = Re4a[2] - np.pi / 2
+    joint_config.append(np.array([q1, q2, q3, q4, q5]))
+    # Second Solution
+    q3_ = np.pi / 2 + theta0 + np.arccos((l2*l2 + l3*l3 + l4*l4 - x4p*x4p - z4p*z4p)/(2*l4*np.sqrt(l2*l2+l3*l3))) # Maybe multiple solution
+    theta2 = np.arctan((l3 + l4*np.cos(q3_))/(l2 - l4*np.sin(q3_)))
+    q2_ = np.pi / 2 - theta1 - theta2
+    R4w_ = Rotation.from_euler('ZYZ', [q1, - np.pi / 2, np.pi/2 + q2_ + q3_]).as_matrix()
+    Re4_ = np.linalg.inv(R4w_) @ end_matrix
+    Re4a_ = Rotation.from_matrix(Re4_).as_euler('ZYZ')
+    q4_ = Re4a_[0]
+    q5_ = Re4a_[2] - np.pi / 2
+    joint_config.append(np.array([q1, q2_, q3_, q4_, q5_]))
+
+    return joint_config
